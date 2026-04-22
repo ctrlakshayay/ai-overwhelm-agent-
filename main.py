@@ -24,12 +24,6 @@ def get_pairs(query: str):
     pairs = re.findall(r'([A-Z][a-zA-Z]+)\s*[=:]\s*(\d+(?:\.\d+)?)', query)
     if pairs:
         return [(n, float(v)) for n, v in pairs]
-    pairs = re.findall(
-        r'([A-Z][a-zA-Z]+)\s+(\d+(?:\.\d+)?)\s*(?:points?|marks?|score)',
-        query
-    )
-    if pairs:
-        return [(n, float(v)) for n, v in pairs]
     return []
 
 @app.post("/solve")
@@ -37,12 +31,10 @@ async def solve(request: SolveRequest):
     query = request.query
     q = query.lower()
 
-    # LEVEL 5: name-value pairs
     pairs = get_pairs(query)
     if pairs:
         highest_kw = ["highest","most","best","maximum","max","largest","top","winner","won","greater","more","bigger","better","leads","ahead"]
         lowest_kw  = ["lowest","least","minimum","min","worst","fewest","smallest","bottom","less","fewer","lower","behind","last"]
-
         if any(w in q for w in highest_kw):
             return {"output": max(pairs, key=lambda x: x[1])[0]}
         if any(w in q for w in lowest_kw):
@@ -59,7 +51,6 @@ async def solve(request: SolveRequest):
             return {"output": str(int(avg) if avg == int(avg) else round(avg, 2))}
         return {"output": max(pairs, key=lambda x: x[1])[0]}
 
-    # LEVEL 4: number list
     list_match = re.search(r'[Nn]umbers?[:\s]+([\d,\s]+)', query)
     if list_match:
         raw = re.split(r'[^\d,\s]', list_match.group(1))[0]
@@ -78,14 +69,12 @@ async def solve(request: SolveRequest):
             if "sort" in q: return {"output": ", ".join(str(n) for n in sorted(nums))}
             return {"output": str(sum(nums))}
 
-    # LEVEL 3: parity
     parity = re.search(r'is\s+(-?\d+)\s+(odd|even)', q)
     if parity:
         num, kind = int(parity.group(1)), parity.group(2)
         if kind == "even": return {"output": "YES" if num % 2 == 0 else "NO"}
         return {"output": "YES" if num % 2 != 0 else "NO"}
 
-    # LEVEL 2: date
     date = re.search(
         r'\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}',
         query, re.IGNORECASE
@@ -93,7 +82,6 @@ async def solve(request: SolveRequest):
     if date:
         return {"output": date.group(0)}
 
-    # ARITHMETIC
     arith = re.search(r'(-?\d+)\s*([+\-*/])\s*(-?\d+)', query)
     if arith:
         a, op, b = int(arith.group(1)), arith.group(2), int(arith.group(3))
