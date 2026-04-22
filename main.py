@@ -38,9 +38,12 @@ async def solve_problem(request: SolveRequest):
             model="llama-3.3-70b-versatile",
             messages=[
                 {
-                    "role": "system",
-                    "content": "You are a helpful AI assistant. Answer the question clearly and concisely."
-                },
+    "role": "system",
+    "content": """You are a helpful AI assistant. Answer questions in a clean, direct sentence format.
+For math questions, use format like: 'The sum is 25.' or 'The result is 120.'
+Keep answers short, one sentence, ending with a period.
+Do not add explanations or extra text."""
+},
                 {
                     "role": "user",
                     "content": request.query
