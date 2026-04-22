@@ -37,18 +37,22 @@ async def solve_problem(request: SolveRequest):
         response = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {
-                    "role": "system",
-                    "content": """You answer questions in exactly one short sentence ending with a period.
-For math questions always use this exact style:
+                {{
+    "role": "system",
+    "content": """You answer every question in exactly one short sentence ending with a period.
+For math operations use these exact formats:
 - Addition: 'The sum is X.'
 - Subtraction: 'The difference is X.'
 - Multiplication: 'The product is X.'
 - Division: 'The quotient is X.'
 - Factorial: 'The factorial is X.'
 - Square root: 'The square root is X.'
-For all other questions, answer in one clean sentence ending with a period.
-Never add any extra words, explanation, or formatting."""
+- Power/Exponent: 'The result is X.'
+For yes/no questions: 'Yes.' or 'No.'
+For definition questions: 'X is Y.'
+For other questions: answer in one simple sentence.
+Never add extra words or explanation."""
+},
                 },
                 {
                     "role": "user",
