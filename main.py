@@ -18,20 +18,23 @@ async def solve_problem(request: SolveRequest):
     query = request.query
     q_low = query.lower()
 
-    # 1. LEVEL 4 LOGIC: SUM EVEN/ODD NUMBERS
-    # We find all digits in the string, convert to integers
-    numbers = [int(n) for n in re.findall(r'\d+', query)]
+    # 1. UNIVERSAL MATH LOGIC (Level 4)
+    # Detects: sum, add, total, calculate. Detects: -1, 0, 1, 100.
+    # Logic: Finds integers, filters by parity, sums them.
+    numbers = [int(n) for n in re.findall(r'-?\d+', query)]
     
-    if numbers and "sum" in q_low:
+    # Trigger if math keywords are present AND numbers exist
+    math_keywords = ["sum", "add", "total", "calculate"]
+    if numbers and any(word in q_low for word in math_keywords):
         if "even" in q_low:
             result = sum(n for n in numbers if n % 2 == 0)
             return {"output": str(result)}
-        if "odd" in q_low:
+        elif "odd" in q_low:
             result = sum(n for n in numbers if n % 2 != 0)
             return {"output": str(result)}
 
-    # 2. LEVEL 3 LOGIC: PARITY CHECK (Is X odd/even?)
-    num_match = re.search(r'\d+', q_low)
+    # 2. PARITY LOGIC (Level 3 - "Is X odd/even?")
+    num_match = re.search(r'-?\d+', q_low)
     if num_match and ("odd" in q_low or "even" in q_low):
         num = int(num_match.group())
         if "odd" in q_low:
@@ -39,7 +42,7 @@ async def solve_problem(request: SolveRequest):
         if "even" in q_low:
             return {"output": "YES" if num % 2 == 0 else "NO"}
 
-    # 3. LEVEL 2 LOGIC: DATE EXTRACTION
+    # 3. DATE LOGIC (Level 2)
     date_pattern = r'\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}'
     date_match = re.search(date_pattern, query, re.IGNORECASE)
     if date_match:
