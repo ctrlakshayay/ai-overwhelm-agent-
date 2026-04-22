@@ -13,16 +13,14 @@ class SolveRequest(BaseModel):
 async def solve_problem(request: SolveRequest):
     query = request.query
     q_low = query.lower()
+    
+    # Extract all numbers found in the query
+    numbers = [int(n) for n in re.findall(r'-?\d+', query)]
 
-    # 1. SUMMATION LOGIC (Strict)
-    # We look specifically for a list pattern: numbers followed by parity requirement
+    # 1. PRIORITY: SUMMATION LOGIC
+    # Only triggered if math keywords exist AND there are numbers to sum
     if any(k in q_low for k in ["sum", "add", "total", "calculate"]):
-        # Extract the segment between "numbers:" and "." to avoid metadata like "20000ms"
-        list_match = re.search(r'numbers:\s*([\d,\s]+)', q_low)
-        if list_match:
-            # Extract only the numbers found in the list segment
-            numbers = [int(n) for n in re.findall(r'\d+', list_match.group(1))]
-            
+        if numbers:
             if "even" in q_low:
                 res = sum(n for n in numbers if n % 2 == 0)
                 return {"output": str(res)}
@@ -32,8 +30,8 @@ async def solve_problem(request: SolveRequest):
             else:
                 return {"output": str(sum(numbers))}
 
-    # 2. PARITY LOGIC (Level 3 - Is X odd/even?)
-    # Only runs if sum keywords are NOT present
+    # 2. PRIORITY: PARITY LOGIC
+    # ONLY triggers if the Sum logic above was NOT triggered
     num_match = re.search(r'-?\d+', q_low)
     if num_match and ("odd" in q_low or "even" in q_low):
         num = int(num_match.group())
@@ -42,11 +40,10 @@ async def solve_problem(request: SolveRequest):
         if "even" in q_low:
             return {"output": "YES" if num % 2 == 0 else "NO"}
 
-    # 3. DATE LOGIC (Level 2)
+    # 3. PRIORITY: DATE LOGIC
     date_pattern = r'\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}'
     date_match = re.search(date_pattern, query, re.IGNORECASE)
     if date_match:
         return {"output": date_match.group(0)}
 
-    # Default
     return {"output": "0"}
