@@ -14,31 +14,54 @@ class SolveRequest(BaseModel):
 async def health():
     return {"status": "ok"}
 
+# ── DEBUG: see exactly what your server extracts ──────────────────────────────
+@app.get("/debug")
+async def debug():
+    query = "Alice scored 80, Bob scored 90. Who scored highest?"
+    pairs = get_pairs(query)
+    q = query.lower()
+    highest_kw = ["highest","most","best","maximum","max","largest","top","winner","won","greater","more","bigger","better"]
+    hit = [w for w in highest_kw if w in q]
+    result = max(pairs, key=lambda x: x[1])[0] if pairs else "NO PAIRS FOUND"
+    return {"pairs": pairs, "keywords_hit": hit, "output": result}
+
+# ── PAIR EXTRACTOR ────────────────────────────────────────────────────────────
 def get_pairs(query: str):
-    """Extract (Name, score) pairs from query."""
-    # Matches: Alice scored 80 / Alice got 80 / Alice has 80 / Alice earned 80
+    # Pattern 1: "Name scored/got/has/earned/received/made/achieved NUMBER"
     pairs = re.findall(
-        r'([A-Z][a-z]+)\s+(?:scored|got|has|earned|received|made|achieved|with)\s+(\d+(?:\.\d+)?)',
+        r'([A-Z][a-zA-Z]+)\s+(?:scored|got|has|earned|received|made|achieved|with|marks?)\s+(\d+(?:\.\d+)?)',
         query
     )
     if pairs:
         return [(n, float(v)) for n, v in pairs]
-    # Matches: Alice: 80 / Alice = 80
-    pairs = re.findall(r'([A-Z][a-z]+)\s*[=:]\s*(\d+(?:\.\d+)?)', query)
+
+    # Pattern 2: "Name: NUMBER" or "Name = NUMBER"
+    pairs = re.findall(r'([A-Z][a-zA-Z]+)\s*[=:]\s*(\d+(?:\.\d+)?)', query)
     if pairs:
         return [(n, float(v)) for n, v in pairs]
+
+    # Pattern 3: "Name NUMBER points/marks/score"
+    pairs = re.findall(
+        r'([A-Z][a-zA-Z]+)\s+(\d+(?:\.\d+)?)\s*(?:points?|marks?|score)',
+        query
+    )
+    if pairs:
+        return [(n, float(v)) for n, v in pairs]
+
     return []
 
+# ── MAIN ENDPOINT ─────────────────────────────────────────────────────────────
 @app.post("/solve")
 async def solve(request: SolveRequest):
     query = request.query
     q = query.lower()
 
+    # ── LEVEL 5: NAME-VALUE PAIRS ─────────────────────────────────────────────
     pairs = get_pairs(query)
 
     if pairs:
-        highest_kw = ["highest", "most", "best", "maximum", "max", "largest", "top", "winner", "won", "greater", "more", "bigger", "better"]
-        lowest_kw  = ["lowest", "least", "minimum", "min", "worst", "fewest", "smallest", "bottom", "less", "fewer", "lower"]
+        highest_kw = ["highest","most","best","maximum","max","largest","top","winner","won","greater","more","bigger","better","leads","ahead"]
+        lowest_kw  = ["lowest","least","minimum","min","worst","fewest","smallest","bottom","less","fewer","lower","behind","last"]
 
         if any(w in q for w in highest_kw):
             return {"output": max(pairs, key=lambda x: x[1])[0]}
@@ -46,12 +69,12 @@ async def solve(request: SolveRequest):
         if any(w in q for w in lowest_kw):
             return {"output": min(pairs, key=lambda x: x[1])[0]}
 
-        if "difference" in q or "how much more" in q or "how much less" in q:
+        if "difference" in q or "how much more" in q or "how much less" in q or "gap" in q:
             vals = sorted([v for _, v in pairs])
             diff = vals[-1] - vals[0]
             return {"output": str(int(diff) if diff == int(diff) else diff)}
 
-        if "total" in q or "sum" in q or "combined" in q or "together" in q:
+        if "total" in q or "sum" in q or "combined" in q or "together" in q or "both" in q:
             total = sum(v for _, v in pairs)
             return {"output": str(int(total) if total == int(total) else total)}
 
@@ -59,10 +82,18 @@ async def solve(request: SolveRequest):
             avg = sum(v for _, v in pairs) / len(pairs)
             return {"output": str(int(avg) if avg == int(avg) else round(avg, 2))}
 
-        # Default: return name with highest value
+        if "how many" in q and "above" in q:
+            threshold = float(re.search(r'above\s+(\d+)', q).group(1))
+            return {"output": str(sum(1 for _, v in pairs if v > threshold))}
+
+        if "how many" in q and "below" in q:
+            threshold = float(re.search(r'below\s+(\d+)', q).group(1))
+            return {"output": str(sum(1 for _, v in pairs if v < threshold))}
+
+        # Default: highest
         return {"output": max(pairs, key=lambda x: x[1])[0]}
 
-    # NUMBER LIST
+    # ── LEVEL 4: NUMBER LIST ──────────────────────────────────────────────────
     list_match = re.search(r'[Nn]umbers?[:\s]+([\d,\s]+)', query)
     if list_match:
         raw = re.split(r'[^\d,\s]', list_match.group(1))[0]
@@ -87,7 +118,7 @@ async def solve(request: SolveRequest):
                 return {"output": ", ".join(str(n) for n in sorted(nums))}
             return {"output": str(sum(nums))}
 
-    # PARITY
+    # ── LEVEL 3: PARITY ───────────────────────────────────────────────────────
     parity = re.search(r'is\s+(-?\d+)\s+(odd|even)', q)
     if parity:
         num = int(parity.group(1))
@@ -96,7 +127,7 @@ async def solve(request: SolveRequest):
             return {"output": "YES" if num % 2 == 0 else "NO"}
         return {"output": "YES" if num % 2 != 0 else "NO"}
 
-    # DATE
+    # ── LEVEL 2: DATE ─────────────────────────────────────────────────────────
     date = re.search(
         r'\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}',
         query, re.IGNORECASE
@@ -104,7 +135,7 @@ async def solve(request: SolveRequest):
     if date:
         return {"output": date.group(0)}
 
-    # ARITHMETIC
+    # ── ARITHMETIC ────────────────────────────────────────────────────────────
     arith = re.search(r'(-?\d+)\s*([+\-*/])\s*(-?\d+)', query)
     if arith:
         a, op, b = int(arith.group(1)), arith.group(2), int(arith.group(3))
